@@ -263,12 +263,28 @@ struct MergePlanView: View {
         let store = CNContactStore()
         
         do {
-            // Create save request for merged contact
+            // Fetch full contacts with all required keys
+            let keysToFetch: [CNKeyDescriptor] = [
+                CNContactIdentifierKey as CNKeyDescriptor,
+                CNContactGivenNameKey as CNKeyDescriptor,
+                CNContactFamilyNameKey as CNKeyDescriptor,
+                CNContactPhoneNumbersKey as CNKeyDescriptor,
+                CNContactEmailAddressesKey as CNKeyDescriptor
+            ]
+            
+            // Get full contacts with all required keys
+            let fullContacts = try originalContacts.map { contact in
+                try store.unifiedContact(withIdentifier: contact.identifier, keysToFetch: keysToFetch)
+            }
+            
+            // Create save request
             let saveRequest = CNSaveRequest()
+            
+            // Add the merged contact first
             saveRequest.add(mergedContact, toContainerWithIdentifier: nil)
             
-            // Create delete requests for original contacts
-            for contact in originalContacts {
+            // Delete the original contacts
+            for contact in fullContacts {
                 let mutableContact = contact.mutableCopy() as! CNMutableContact
                 saveRequest.delete(mutableContact)
             }

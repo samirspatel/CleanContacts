@@ -405,20 +405,8 @@ struct ContentView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        VStack {
-                            if duplicateGroups.isEmpty {
-                                Button("Find Duplicates") {
-                                    Task {
-                                        await findDuplicates()
-                                    }
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .padding()
-                            } else {
-                                DuplicatesTableView(duplicateGroups: duplicateGroups)
-                                    .padding()
-                            }
-                        }
+                        DuplicatesTableView(duplicateGroups: duplicateGroups)
+                            .padding()
                     }
                 }
                 .navigationTitle("Duplicate Contacts (\(totalDuplicates))")
@@ -524,7 +512,10 @@ struct ContentView: View {
         print("Loading contacts...")
         await fetchContacts(store)
         
-        // Hide loading indicator after contacts are loaded
+        // After contacts are loaded, automatically scan for duplicates
+        await findDuplicates()
+        
+        // Hide loading indicator after everything is done
         await MainActor.run {
             isLoading = false
         }

@@ -232,16 +232,14 @@ struct ContentView: View {
         }
     }
     
-    private func loadContacts() {
+    private func loadContacts() async {
         let store = CNContactStore()
-        
         print("Loading contacts...")
-        Task {
-            await fetchContacts(store)
-            // Hide loading indicator after contacts are loaded
-            await MainActor.run {
-                isLoading = false
-            }
+        await fetchContacts(store)
+        
+        // Hide loading indicator after contacts are loaded
+        await MainActor.run {
+            isLoading = false
         }
     }
     
@@ -291,7 +289,10 @@ struct ContentView: View {
         case .authorized:
             print("Access already authorized - loading contacts")
             isLoading = true
-            loadContacts()
+            // Use Task for async call
+            Task {
+                await loadContacts()
+            }
         @unknown default:
             print("Unknown authorization status")
             alertMessage = "Unknown contacts access status. Please check System Settings."
@@ -320,30 +321,34 @@ struct ContentView: View {
     }
     
     private func requestContactsAccess() {
-        let store = CNContactStore()
-        print("Requesting contacts access...")
-        isLoading = true // Show loading while requesting
-        
-        store.requestAccess(for: .contacts) { granted, error in
-            if let error = error {
-                print("Error requesting access: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    isLoading = false
-                    self.alertMessage = "Error: \(error.localizedDescription)"
-                    self.showAlert = true
-                }
-                return
+        Task {
+            let store = CNContactStore()
+            print("Requesting contacts access...")
+            
+            await MainActor.run {
+                isLoading = true // Show loading while requesting
             }
             
-            if granted {
-                print("Access granted, loading contacts...")
-                loadContacts()
-            } else {
-                print("Access denied by user")
-                DispatchQueue.main.async {
+            do {
+                let granted = try await store.requestAccess(for: .contacts)
+                
+                if granted {
+                    print("Access granted, loading contacts...")
+                    await loadContacts()
+                } else {
+                    print("Access denied by user")
+                    await MainActor.run {
+                        isLoading = false
+                        alertMessage = "Access denied. Please try again or grant access in System Settings."
+                        showAlert = true
+                    }
+                }
+            } catch {
+                print("Error requesting access: \(error.localizedDescription)")
+                await MainActor.run {
                     isLoading = false
-                    self.alertMessage = "Access denied. Please try again or grant access in System Settings."
-                    self.showAlert = true
+                    alertMessage = "Error: \(error.localizedDescription)"
+                    showAlert = true
                 }
             }
         }

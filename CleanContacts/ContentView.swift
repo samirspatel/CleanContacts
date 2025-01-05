@@ -107,7 +107,11 @@ struct DuplicateDetailView: View {
                 Button("OK") {
                     if !alertMessage.contains("Error") {
                         detailStore.onMergeComplete?(contacts)
-                        dismissWindow(id: "duplicateDetails")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            dismissWindow(id: "duplicateDetails")
+                            detailStore.selectedContacts = nil
+                            detailStore.onMergeComplete = nil
+                        }
                     }
                 }
             } message: {
@@ -157,9 +161,6 @@ struct DuplicateDetailView: View {
             }
             
             try store.execute(saveRequest)
-            
-            // Call completion handler to update UI
-            detailStore.onMergeComplete?(contacts)
             
             alertMessage = "Contacts successfully merged!"
             showAlert = true

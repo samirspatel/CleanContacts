@@ -2,6 +2,12 @@ import SwiftUI
 import SwiftData
 import Contacts
 
+class DetailViewStore: ObservableObject {
+    static let shared = DetailViewStore()
+    @Published var selectedContacts: [CNContact]?
+    @Published var onMergeComplete: (([CNContact]) -> Void)?
+}
+
 struct ContactRowView: View {
     let contact: CNContact
     
@@ -35,101 +41,12 @@ struct ContactRowView: View {
 }
 
 struct DuplicateDetailView: View {
-    static var contacts: [CNContact] = []
+    @StateObject private var detailStore = DetailViewStore.shared
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
     
     var body: some View {
-        VStack {
-            HStack {
-                Text("Duplicate Details")
-                    .font(.title2)
-                    .bold()
-                Spacer()
-            }
-            .padding()
-            
-            List(DuplicateDetailView.contacts, id: \.identifier) { contact in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("\(contact.givenName) \(contact.familyName)")
-                        .font(.headline)
-                    
-                    if !contact.phoneNumbers.isEmpty {
-                        Text("Phone Numbers:")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        ForEach(contact.phoneNumbers, id: \.identifier) { phone in
-                            HStack {
-                                Image(systemName: "phone")
-                                Text(phone.value.stringValue)
-                            }
-                        }
-                    }
-                    
-                    if !contact.emailAddresses.isEmpty {
-                        Text("Email Addresses:")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        ForEach(contact.emailAddresses, id: \.hashValue) { email in
-                            HStack {
-                                Image(systemName: "envelope")
-                                Text(email.value as String)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            
-            // Add buttons at the bottom
-            HStack {
-                Button("Close") {
-                    dismissWindow(id: "duplicateDetails")
-                }
-                .buttonStyle(.bordered)
-                
-                Button("Merge These Contacts") {
-                    // Set up merge plan view
-                    MergePlanView.contact = mergeContacts(DuplicateDetailView.contacts)
-                    MergePlanView.originalContacts = DuplicateDetailView.contacts
-                    dismissWindow(id: "duplicateDetails")
-                    openWindow(id: "mergePlan")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-        }
-        .frame(width: 400, height: 500)
-    }
-    
-    private func mergeContacts(_ contacts: [CNContact]) -> CNContact {
-        // Simplified merge logic: take the first contact and append unique phone numbers and emails
-        guard let firstContact = contacts.first else { return CNContact() }
-        
-        let mergedContact = CNMutableContact()
-        mergedContact.givenName = firstContact.givenName
-        mergedContact.familyName = firstContact.familyName
-        
-        var phoneNumbers = Set<String>()
-        var emailAddresses = Set<String>()
-        
-        for contact in contacts {
-            phoneNumbers.formUnion(contact.phoneNumbers.map { $0.value.stringValue })
-            emailAddresses.formUnion(contact.emailAddresses.map { $0.value as String })
-        }
-        
-        mergedContact.phoneNumbers = phoneNumbers.map { CNLabeledValue(label: CNLabelPhoneNumberMobile, value: CNPhoneNumber(stringValue: $0)) }
-        mergedContact.emailAddresses = emailAddresses.map { CNLabeledValue(label: CNLabelHome, value: $0 as NSString) }
-        
-        return mergedContact
-    }
-}
-
-struct DuplicateDetailWindow: Scene {
-    let contacts: [CNContact]
-    
-    var body: some Scene {
-        Window("Duplicate Details", id: "duplicateDetails") {
+        if let contacts = detailStore.selectedContacts {
             VStack {
                 HStack {
                     Text("Duplicate Details")
@@ -170,16 +87,57 @@ struct DuplicateDetailWindow: Scene {
                     }
                     .padding(.vertical, 4)
                 }
+                
+                HStack {
+                    Button("Close") {
+                        dismissWindow(id: "duplicateDetails")
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Merge These Contacts") {
+                        MergePlanView.contact = mergeContacts(contacts)
+                        MergePlanView.originalContacts = contacts
+                        MergePlanView.onMergeComplete = {
+                            detailStore.onMergeComplete?(contacts)
+                        }
+                        dismissWindow(id: "duplicateDetails")
+                        openWindow(id: "mergePlan")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
             }
             .frame(width: 400, height: 500)
         }
-        .defaultSize(width: 400, height: 500)
+    }
+    
+    private func mergeContacts(_ contacts: [CNContact]) -> CNContact {
+        // Simplified merge logic: take the first contact and append unique phone numbers and emails
+        guard let firstContact = contacts.first else { return CNContact() }
+        
+        let mergedContact = CNMutableContact()
+        mergedContact.givenName = firstContact.givenName
+        mergedContact.familyName = firstContact.familyName
+        
+        var phoneNumbers = Set<String>()
+        var emailAddresses = Set<String>()
+        
+        for contact in contacts {
+            phoneNumbers.formUnion(contact.phoneNumbers.map { $0.value.stringValue })
+            emailAddresses.formUnion(contact.emailAddresses.map { $0.value as String })
+        }
+        
+        mergedContact.phoneNumbers = phoneNumbers.map { CNLabeledValue(label: CNLabelPhoneNumberMobile, value: CNPhoneNumber(stringValue: $0)) }
+        mergedContact.emailAddresses = emailAddresses.map { CNLabeledValue(label: CNLabelHome, value: $0 as NSString) }
+        
+        return mergedContact
     }
 }
 
 struct MergePlanView: View {
     static var contact: CNContact?
     static var originalContacts: [CNContact]?
+    static var onMergeComplete: (() -> Void)? // Add callback for merge completion
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var showAlert = false
     @State private var alertMessage = ""
@@ -284,6 +242,9 @@ struct MergePlanView: View {
             // Execute the save request
             try store.execute(saveRequest)
             
+            // Call the completion handler to update the table
+            MergePlanView.onMergeComplete?()
+            
             alertMessage = "Contacts successfully merged!"
             showAlert = true
         } catch {
@@ -295,8 +256,9 @@ struct MergePlanView: View {
 
 struct DuplicatesTableView: View {
     let duplicateGroups: [String: [CNContact]]
+    @State private var mergedGroups: Set<String> = []
     @Environment(\.openWindow) private var openWindow
-    @State private var selectedContacts: [CNContact]?
+    @StateObject private var detailStore = DetailViewStore.shared
     
     struct DuplicateEntry: Identifiable {
         let id: UUID
@@ -325,12 +287,24 @@ struct DuplicatesTableView: View {
                 Text("\(entry.count - 1)")
                     .foregroundStyle(entry.count > 1 ? .red : .secondary)
             }
-            TableColumn("") { (entry: DuplicateEntry) in
-                Button("Detail") {
-                    DuplicateDetailView.contacts = entry.contacts
-                    openWindow(id: "duplicateDetails")
+            TableColumn("Status") { (entry: DuplicateEntry) in
+                HStack {
+                    if mergedGroups.contains(entry.name) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                    Button("Detail") {
+                        detailStore.selectedContacts = entry.contacts
+                        detailStore.onMergeComplete = { contacts in
+                            if let firstContact = contacts.first {
+                                let name = "\(firstContact.givenName) \(firstContact.familyName)".trimmingCharacters(in: .whitespaces)
+                                mergedGroups.insert(name)
+                            }
+                        }
+                        openWindow(id: "duplicateDetails")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
         .frame(minHeight: 400)
@@ -404,8 +378,10 @@ struct ContentView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        DuplicatesTableView(duplicateGroups: duplicateGroups)
-                            .padding()
+                        DuplicatesTableView(
+                            duplicateGroups: duplicateGroups
+                        )
+                        .padding()
                     }
                 }
                 .navigationTitle("Duplicate Contacts (\(totalDuplicates))")
@@ -643,8 +619,6 @@ struct ContentView: View {
             }
         }
     }
-    
-    // Keep your existing duplicate scanning methods...
 }
 
 #Preview {

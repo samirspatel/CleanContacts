@@ -35,80 +35,116 @@ struct ContactRowView: View {
 }
 
 struct DuplicateDetailView: View {
-    let contacts: [CNContact]
-    @Binding var isPresented: Bool
+    static var contacts: [CNContact] = [] // Static property to hold contacts
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack {
             HStack {
                 Text("Duplicate Details")
                     .font(.title2)
                     .bold()
                 Spacer()
-                Button("Close") {
-                    isPresented = false
-                }
-                .buttonStyle(.bordered)
             }
-            .padding(.bottom)
+            .padding()
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(contacts, id: \.identifier) { contact in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("\(contact.givenName) \(contact.familyName)")
-                                .font(.headline)
-                            
-                            if !contact.phoneNumbers.isEmpty {
-                                Text("Phone Numbers:")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                ForEach(contact.phoneNumbers, id: \.identifier) { phone in
-                                    HStack {
-                                        Image(systemName: "phone")
-                                        Text(phone.value.stringValue)
-                                    }
-                                }
+            List(DuplicateDetailView.contacts, id: \.identifier) { contact in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(contact.givenName) \(contact.familyName)")
+                        .font(.headline)
+                    
+                    if !contact.phoneNumbers.isEmpty {
+                        Text("Phone Numbers:")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        ForEach(contact.phoneNumbers, id: \.identifier) { phone in
+                            HStack {
+                                Image(systemName: "phone")
+                                Text(phone.value.stringValue)
                             }
-                            
-                            if !contact.emailAddresses.isEmpty {
-                                Text("Email Addresses:")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                ForEach(contact.emailAddresses, id: \.hashValue) { email in
-                                    HStack {
-                                        Image(systemName: "envelope")
-                                        Text(email.value as String)
-                                    }
-                                }
-                            }
-                            
-                            if contact != contacts.last {
-                                Divider()
-                                    .padding(.vertical, 8)
+                        }
+                    }
+                    
+                    if !contact.emailAddresses.isEmpty {
+                        Text("Email Addresses:")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        ForEach(contact.emailAddresses, id: \.hashValue) { email in
+                            HStack {
+                                Image(systemName: "envelope")
+                                Text(email.value as String)
                             }
                         }
                     }
                 }
+                .padding(.vertical, 4)
             }
         }
-        .padding()
         .frame(width: 400, height: 500)
-        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
+struct DuplicateDetailWindow: Scene {
+    let contacts: [CNContact]
+    
+    var body: some Scene {
+        Window("Duplicate Details", id: "duplicateDetails") {
+            VStack {
+                HStack {
+                    Text("Duplicate Details")
+                        .font(.title2)
+                        .bold()
+                    Spacer()
+                }
+                .padding()
+                
+                List(contacts, id: \.identifier) { contact in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("\(contact.givenName) \(contact.familyName)")
+                            .font(.headline)
+                        
+                        if !contact.phoneNumbers.isEmpty {
+                            Text("Phone Numbers:")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            ForEach(contact.phoneNumbers, id: \.identifier) { phone in
+                                HStack {
+                                    Image(systemName: "phone")
+                                    Text(phone.value.stringValue)
+                                }
+                            }
+                        }
+                        
+                        if !contact.emailAddresses.isEmpty {
+                            Text("Email Addresses:")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            ForEach(contact.emailAddresses, id: \.hashValue) { email in
+                                HStack {
+                                    Image(systemName: "envelope")
+                                    Text(email.value as String)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .frame(width: 400, height: 500)
+        }
+        .defaultSize(width: 400, height: 500)
     }
 }
 
 struct DuplicatesTableView: View {
     let duplicateGroups: [String: [CNContact]]
+    @Environment(\.openWindow) private var openWindow
     @State private var selectedContacts: [CNContact]?
-    @State private var showingDetail = false
     
-    // Modified DuplicateEntry to use a unique ID
     struct DuplicateEntry: Identifiable {
-        let id: UUID // Use UUID for unique identification
+        let id: UUID
         let name: String
         let count: Int
-        let contacts: [CNContact] // Store the actual contacts for reference
+        let contacts: [CNContact]
     }
     
     var tableData: [DuplicateEntry] {
@@ -127,26 +163,19 @@ struct DuplicatesTableView: View {
     var body: some View {
         Table(tableData) {
             TableColumn("Contact Name", value: \.name)
-            TableColumn("Duplicates") { entry in
+            TableColumn("Duplicates") { (entry: DuplicateEntry) in
                 Text("\(entry.count - 1)")
                     .foregroundStyle(entry.count > 1 ? .red : .secondary)
             }
-            TableColumn("") { entry in
+            TableColumn("") { (entry: DuplicateEntry) in
                 Button("Detail") {
-                    selectedContacts = entry.contacts
-                    showingDetail = true
+                    DuplicateDetailView.contacts = entry.contacts
+                    openWindow(id: "duplicateDetails")
                 }
                 .buttonStyle(.borderedProminent)
             }
         }
         .frame(minHeight: 400)
-        .sheet(isPresented: $showingDetail, onDismiss: {
-            selectedContacts = nil
-        }) {
-            if let contacts = selectedContacts {
-                DuplicateDetailView(contacts: contacts, isPresented: $showingDetail)
-            }
-        }
     }
 }
 

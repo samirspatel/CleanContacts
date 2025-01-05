@@ -45,21 +45,24 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var showSettings = false
     @State private var isLoading = false
+    @State private var duplicateGroups: [String: [CNContact]] = [:] // Key is name+phone/email, Value is array of duplicate contacts
+    @State private var isDuplicateSearching = false
     
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 Group {
-                    if isLoading {
+                    if isLoading || isDuplicateSearching {
                         VStack {
                             ProgressView()
                                 .controlSize(.large)
-                            Text("Loading Contacts...")
+                            Text(isDuplicateSearching ? "Scanning for Duplicates..." : "Loading Contacts...")
                                 .foregroundStyle(.secondary)
                                 .padding()
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if allContacts.isEmpty {
+                    } else if !hasContactAccess {
+                        // Show permission request view
                         VStack(spacing: 20) {
                             Image(systemName: "person.crop.circle.badge.exclamationmark")
                                 .font(.system(size: 50))
@@ -76,39 +79,115 @@ struct ContentView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        List {
-                            ForEach(allContacts, id: \.identifier) { contact in
-                                ContactRowView(contact: contact)
+                        VStack {
+                            if duplicateGroups.isEmpty {
+                                Button("Find Duplicates") {
+                                    Task {
+                                        await findDuplicates()
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .padding()
+                            } else {
+                                List {
+                                    ForEach(Array(duplicateGroups.keys.sorted()), id: \.self) { key in
+                                        if let contacts = duplicateGroups[key] {
+                                            DuplicateGroupView(contacts: contacts)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                .navigationTitle("All Contacts (\(allContacts.count))")
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(action: loadContacts) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                    }
-                }
+                .navigationTitle("Duplicate Contacts (\(totalDuplicates))")
             }
             .tabItem {
-                Label("Contacts", systemImage: "person.2")
+                Label("Duplicates", systemImage: "person.2")
             }
             .tag(0)
-            
-            // Rest of your existing TabView content...
-        }
-        .alert("Contacts Access", isPresented: $showAlert) {
-            Button("Open Settings") {
-                openSettings()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
         }
         .onAppear {
             checkContactsAccess()
+        }
+    }
+    
+    private var hasContactAccess: Bool {
+        CNContactStore.authorizationStatus(for: .contacts) == .authorized
+    }
+    
+    private var totalDuplicates: Int {
+        duplicateGroups.values.reduce(0) { $0 + max($1.count - 1, 0) }
+    }
+    
+    private func findDuplicates() async {
+        isDuplicateSearching = true
+        defer { isDuplicateSearching = false }
+        
+        let store = CNContactStore()
+        
+        do {
+            let keysToFetch = [
+                CNContactGivenNameKey,
+                CNContactFamilyNameKey,
+                CNContactPhoneNumbersKey,
+                CNContactEmailAddressesKey
+            ] as [CNKeyDescriptor]
+            
+            let request = CNContactFetchRequest(keysToFetch: keysToFetch)
+            var contacts: [CNContact] = []
+            
+            try store.enumerateContacts(with: request) { contact, _ in
+                contacts.append(contact)
+            }
+            
+            // Group contacts by potential duplicates
+            var groups: [String: [CNContact]] = [:]
+            
+            for contact in contacts {
+                let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces).lowercased()
+                let phones = contact.phoneNumbers.map { $0.value.stringValue.filter { $0.isNumber } }
+                let emails = contact.emailAddresses.map { $0.value as String }
+                
+                // Create keys for matching
+                var keys: Set<String> = []
+                
+                // Add name-based key if name is not empty
+                if !name.isEmpty {
+                    keys.insert("n_\(name)")
+                }
+                
+                // Add phone-based keys
+                for phone in phones {
+                    if !phone.isEmpty {
+                        keys.insert("p_\(phone)")
+                    }
+                }
+                
+                // Add email-based keys
+                for email in emails {
+                    if !email.isEmpty {
+                        keys.insert("e_\(email)")
+                    }
+                }
+                
+                // Add contact to all matching groups
+                for key in keys {
+                    groups[key, default: []].append(contact)
+                }
+            }
+            
+            // Filter out groups with no duplicates
+            let duplicates = groups.filter { $0.value.count > 1 }
+            
+            await MainActor.run {
+                duplicateGroups = duplicates
+            }
+        } catch {
+            await MainActor.run {
+                alertMessage = "Error scanning contacts: \(error.localizedDescription)"
+                showAlert = true
+            }
         }
     }
     
@@ -240,6 +319,49 @@ struct ContentView: View {
     }
     
     // Keep your existing duplicate scanning methods...
+}
+
+struct DuplicateGroupView: View {
+    let contacts: [CNContact]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("\(contacts.count) duplicates found")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.bottom, 4)
+            
+            ForEach(contacts, id: \.identifier) { contact in
+                VStack(alignment: .leading) {
+                    Text("\(contact.givenName) \(contact.familyName)")
+                        .font(.subheadline)
+                    
+                    ForEach(contact.phoneNumbers, id: \.identifier) { phone in
+                        Text(phone.value.stringValue)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    ForEach(contact.emailAddresses, id: \.hashValue) { email in
+                        Text(email.value as String)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.leading)
+                
+                if contact != contacts.last {
+                    Divider()
+                }
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+        .padding(.horizontal)
+    }
 }
 
 #Preview {

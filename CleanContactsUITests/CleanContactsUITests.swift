@@ -1,10 +1,3 @@
-//
-//  CleanContactsUITests.swift
-//  CleanContactsUITests
-//
-//  Created by Samir Patel on 1/4/25.
-//
-
 import XCTest
 
 final class CleanContactsUITests: XCTestCase {

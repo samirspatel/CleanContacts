@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D42D71842D2A4E9C00375169 /* Contacts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D42D71832D2A4E9C00375169 /* Contacts.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D42D715E2D2A491E00375169 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		D42D714A2D2A491C00375169 /* CleanContacts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CleanContacts.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D42D715D2D2A491E00375169 /* CleanContactsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanContactsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D42D71672D2A491E00375169 /* CleanContactsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanContactsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D42D71832D2A4E9C00375169 /* Contacts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Contacts.framework; path = System/Library/Frameworks/Contacts.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D42D71842D2A4E9C00375169 /* Contacts.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +84,7 @@
 				D42D714C2D2A491C00375169 /* CleanContacts */,
 				D42D71602D2A491E00375169 /* CleanContactsTests */,
 				D42D716A2D2A491E00375169 /* CleanContactsUITests */,
+				D42D71822D2A4E9C00375169 /* Frameworks */,
 				D42D714B2D2A491C00375169 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +97,14 @@
 				D42D71672D2A491E00375169 /* CleanContactsUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D42D71822D2A4E9C00375169 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D42D71832D2A4E9C00375169 /* Contacts.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

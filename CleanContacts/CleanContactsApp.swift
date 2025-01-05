@@ -1,10 +1,3 @@
-//
-//  CleanContactsApp.swift
-//  CleanContacts
-//
-//  Created by Samir Patel on 1/4/25.
-//
-
 import SwiftUI
 import SwiftData
 

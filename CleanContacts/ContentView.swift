@@ -103,24 +103,28 @@ struct ContentView: View {
     private func loadContacts() {
         let store = CNContactStore()
         
-        switch CNContactStore.authorizationStatus(for: .contacts) {
-        case .notDetermined:
-            store.requestAccess(for: .contacts) { granted, error in
-                if !granted {
-                    alertMessage = "Please grant access to contacts in System Settings to use this feature."
-                    showAlert = true
-                } else {
-                    Task { await fetchContacts(store) }
+        // First check current authorization status
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        print("Current authorization status: \(status.rawValue)")
+        
+        // Always request access regardless of current status
+        store.requestAccess(for: .contacts) { granted, error in
+            if let error = error {
+                print("Error requesting access: \(error)")
+            }
+            
+            if granted {
+                print("Access granted")
+                Task {
+                    await fetchContacts(store)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    print("Access denied")
+                    self.alertMessage = "Please grant access to contacts in System Settings to use this feature."
+                    self.showAlert = true
                 }
             }
-        case .authorized:
-            Task { await fetchContacts(store) }
-        case .denied, .restricted:
-            alertMessage = "Contact access denied. Please grant access in System Settings."
-            showAlert = true
-        @unknown default:
-            alertMessage = "Unknown authorization status"
-            showAlert = true
         }
     }
     

@@ -232,74 +232,71 @@ struct ContentView: View {
     }
     
     private func findDuplicates() async {
-        isDuplicateSearching = true
-        defer { isDuplicateSearching = false }
+        await MainActor.run {
+            isDuplicateSearching = true
+        }
         
-        let store = CNContactStore()
-        
-        do {
-            let keysToFetch = [
-                CNContactGivenNameKey,
-                CNContactFamilyNameKey,
-                CNContactPhoneNumbersKey,
-                CNContactEmailAddressesKey
-            ] as [CNKeyDescriptor]
+        // Move to background task
+        await Task.detached(priority: .background) {
+            let store = CNContactStore()
             
-            let request = CNContactFetchRequest(keysToFetch: keysToFetch)
-            var contacts: [CNContact] = []
-            
-            try store.enumerateContacts(with: request) { contact, _ in
-                contacts.append(contact)
-            }
-            
-            // Group contacts by potential duplicates
-            var groups: [String: [CNContact]] = [:]
-            
-            for contact in contacts {
-                let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces).lowercased()
-                let phones = contact.phoneNumbers.map { $0.value.stringValue.filter { $0.isNumber } }
-                let emails = contact.emailAddresses.map { $0.value as String }
+            do {
+                let keysToFetch = [
+                    CNContactGivenNameKey,
+                    CNContactFamilyNameKey,
+                    CNContactPhoneNumbersKey,
+                    CNContactEmailAddressesKey
+                ] as [CNKeyDescriptor]
                 
-                // Create keys for matching
-                var keys: Set<String> = []
+                let request = CNContactFetchRequest(keysToFetch: keysToFetch)
+                var contacts: [CNContact] = []
                 
-                // Add name-based key if name is not empty
-                if !name.isEmpty {
-                    keys.insert("n_\(name)")
+                try store.enumerateContacts(with: request) { contact, _ in
+                    contacts.append(contact)
                 }
                 
-                // Add phone-based keys
-                for phone in phones {
-                    if !phone.isEmpty {
+                // Process duplicates in background
+                var groups: [String: [CNContact]] = [:]
+                
+                for contact in contacts {
+                    let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces).lowercased()
+                    let phones = contact.phoneNumbers.map { $0.value.stringValue.filter { $0.isNumber } }
+                    let emails = contact.emailAddresses.map { $0.value as String }
+                    
+                    var keys: Set<String> = []
+                    
+                    if !name.isEmpty {
+                        keys.insert("n_\(name)")
+                    }
+                    
+                    for phone in phones where !phone.isEmpty {
                         keys.insert("p_\(phone)")
                     }
-                }
-                
-                // Add email-based keys
-                for email in emails {
-                    if !email.isEmpty {
+                    
+                    for email in emails where !email.isEmpty {
                         keys.insert("e_\(email)")
+                    }
+                    
+                    for key in keys {
+                        groups[key, default: []].append(contact)
                     }
                 }
                 
-                // Add contact to all matching groups
-                for key in keys {
-                    groups[key, default: []].append(contact)
+                let duplicates = groups.filter { $0.value.count > 1 }
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    duplicateGroups = duplicates
+                    isDuplicateSearching = false
+                }
+            } catch {
+                await MainActor.run {
+                    alertMessage = "Error scanning contacts: \(error.localizedDescription)"
+                    showAlert = true
+                    isDuplicateSearching = false
                 }
             }
-            
-            // Filter out groups with no duplicates
-            let duplicates = groups.filter { $0.value.count > 1 }
-            
-            await MainActor.run {
-                duplicateGroups = duplicates
-            }
-        } catch {
-            await MainActor.run {
-                alertMessage = "Error scanning contacts: \(error.localizedDescription)"
-                showAlert = true
-            }
-        }
+        }.value
     }
     
     private func openSettings() {
@@ -324,33 +321,40 @@ struct ContentView: View {
     }
     
     private func fetchContacts(_ store: CNContactStore) async {
-        do {
-            let keysToFetch = [
-                CNContactGivenNameKey,
-                CNContactFamilyNameKey,
-                CNContactPhoneNumbersKey,
-                CNContactEmailAddressesKey
-            ] as [CNKeyDescriptor]
-            
-            let request = CNContactFetchRequest(keysToFetch: keysToFetch)
-            var contacts: [CNContact] = []
-            
-            try store.enumerateContacts(with: request) { contact, _ in
-                contacts.append(contact)
-            }
-            
-            await MainActor.run {
-                allContacts = contacts.sorted { 
+        // Move to background task
+        await Task.detached(priority: .background) {
+            do {
+                let keysToFetch = [
+                    CNContactGivenNameKey,
+                    CNContactFamilyNameKey,
+                    CNContactPhoneNumbersKey,
+                    CNContactEmailAddressesKey
+                ] as [CNKeyDescriptor]
+                
+                let request = CNContactFetchRequest(keysToFetch: keysToFetch)
+                var contacts: [CNContact] = []
+                
+                try store.enumerateContacts(with: request) { contact, _ in
+                    contacts.append(contact)
+                }
+                
+                // Sort contacts in background before updating UI
+                let sortedContacts = contacts.sorted { 
                     ($0.givenName + $0.familyName).lowercased() < 
                     ($1.givenName + $1.familyName).lowercased() 
                 }
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    allContacts = sortedContacts
+                }
+            } catch {
+                await MainActor.run {
+                    alertMessage = "Error loading contacts: \(error.localizedDescription)"
+                    showAlert = true
+                }
             }
-        } catch {
-            await MainActor.run {
-                alertMessage = "Error loading contacts: \(error.localizedDescription)"
-                showAlert = true
-            }
-        }
+        }.value
     }
     
     private func checkContactsAccess() {

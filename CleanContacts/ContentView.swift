@@ -34,8 +34,74 @@ struct ContactRowView: View {
     }
 }
 
+struct DuplicateDetailView: View {
+    let contacts: [CNContact]
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Duplicate Details")
+                    .font(.title2)
+                    .bold()
+                Spacer()
+                Button("Close") {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.bottom)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(contacts, id: \.identifier) { contact in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("\(contact.givenName) \(contact.familyName)")
+                                .font(.headline)
+                            
+                            if !contact.phoneNumbers.isEmpty {
+                                Text("Phone Numbers:")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                ForEach(contact.phoneNumbers, id: \.identifier) { phone in
+                                    HStack {
+                                        Image(systemName: "phone")
+                                        Text(phone.value.stringValue)
+                                    }
+                                }
+                            }
+                            
+                            if !contact.emailAddresses.isEmpty {
+                                Text("Email Addresses:")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                ForEach(contact.emailAddresses, id: \.hashValue) { email in
+                                    HStack {
+                                        Image(systemName: "envelope")
+                                        Text(email.value as String)
+                                    }
+                                }
+                            }
+                            
+                            if contact != contacts.last {
+                                Divider()
+                                    .padding(.vertical, 8)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(width: 400, height: 500)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
 struct DuplicatesTableView: View {
     let duplicateGroups: [String: [CNContact]]
+    @State private var selectedContacts: [CNContact]?
+    @State private var showingDetail = false
     
     // Modified DuplicateEntry to use a unique ID
     struct DuplicateEntry: Identifiable {
@@ -50,7 +116,7 @@ struct DuplicatesTableView: View {
             let firstContact = contacts[0]
             let name = "\(firstContact.givenName) \(firstContact.familyName)".trimmingCharacters(in: .whitespaces)
             return DuplicateEntry(
-                id: UUID(), // Generate unique ID
+                id: UUID(),
                 name: name,
                 count: contacts.count,
                 contacts: contacts
@@ -65,8 +131,22 @@ struct DuplicatesTableView: View {
                 Text("\(entry.count - 1)")
                     .foregroundStyle(entry.count > 1 ? .red : .secondary)
             }
+            TableColumn("") { entry in
+                Button("Detail") {
+                    selectedContacts = entry.contacts
+                    showingDetail = true
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }
         .frame(minHeight: 400)
+        .sheet(isPresented: $showingDetail, onDismiss: {
+            selectedContacts = nil
+        }) {
+            if let contacts = selectedContacts {
+                DuplicateDetailView(contacts: contacts, isPresented: $showingDetail)
+            }
+        }
     }
 }
 

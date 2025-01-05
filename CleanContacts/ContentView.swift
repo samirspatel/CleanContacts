@@ -179,24 +179,19 @@ struct DuplicateDetailWindow: Scene {
 
 struct MergePlanView: View {
     static var contact: CNContact?
-    static var originalContacts: [CNContact]?  // Add this to store original contacts
-    @Environment(\.openWindow) private var openWindow
+    static var originalContacts: [CNContact]?
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var showAlert = false
     @State private var alertMessage = ""
     
     var body: some View {
         if let contact = MergePlanView.contact {
-            VStack {
-                HStack {
-                    Text("Merge Plan")
-                        .font(.title2)
-                        .bold()
-                    Spacer()
-                }
-                .padding()
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Merge Plan")
+                    .font(.title2)
+                    .bold()
                 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("\(contact.givenName) \(contact.familyName)")
                         .font(.headline)
                     
@@ -205,8 +200,9 @@ struct MergePlanView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         ForEach(contact.phoneNumbers, id: \.identifier) { phone in
-                            HStack {
+                            HStack(spacing: 4) {
                                 Image(systemName: "phone")
+                                    .imageScale(.small)
                                 Text(phone.value.stringValue)
                             }
                         }
@@ -217,19 +213,17 @@ struct MergePlanView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         ForEach(contact.emailAddresses, id: \.hashValue) { email in
-                            HStack {
+                            HStack(spacing: 4) {
                                 Image(systemName: "envelope")
+                                    .imageScale(.small)
                                 Text(email.value as String)
                             }
                         }
                     }
                 }
-                .padding(.vertical, 4)
-                
-                Spacer()
                 
                 HStack {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismissWindow(id: "mergePlan")
                     }
                     .buttonStyle(.bordered)
@@ -239,14 +233,12 @@ struct MergePlanView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
-                .padding()
             }
-            .frame(width: 400, height: 300)
+            .padding(12)
+            .fixedSize()
             .alert("Merge Result", isPresented: $showAlert) {
                 Button("OK") {
-                    if !alertMessage.contains("Error") {
-                        dismissWindow(id: "mergePlan")
-                    }
+                    dismissWindow(id: "mergePlan")
                 }
             } message: {
                 Text(alertMessage)

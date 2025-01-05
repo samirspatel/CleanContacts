@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Contacts
 
 @main
 struct CleanContactsApp: App {
@@ -10,6 +11,10 @@ struct CleanContactsApp: App {
         
         Window("Duplicate Details", id: "duplicateDetails") {
             DuplicateDetailView()
+        }
+        
+        Window("Merge Plan", id: "mergePlan") {
+            MergePlanView()
         }
     }
 }

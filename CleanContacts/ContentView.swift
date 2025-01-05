@@ -135,6 +135,55 @@ struct DuplicateDetailWindow: Scene {
     }
 }
 
+struct MergePlanView: View {
+    static var contact: CNContact?
+    
+    var body: some View {
+        if let contact = MergePlanView.contact {
+            VStack {
+                HStack {
+                    Text("Merge Plan")
+                        .font(.title2)
+                        .bold()
+                    Spacer()
+                }
+                .padding()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(contact.givenName) \(contact.familyName)")
+                        .font(.headline)
+                    
+                    if !contact.phoneNumbers.isEmpty {
+                        Text("Phone Numbers:")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        ForEach(contact.phoneNumbers, id: \.identifier) { phone in
+                            HStack {
+                                Image(systemName: "phone")
+                                Text(phone.value.stringValue)
+                            }
+                        }
+                    }
+                    
+                    if !contact.emailAddresses.isEmpty {
+                        Text("Email Addresses:")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        ForEach(contact.emailAddresses, id: \.hashValue) { email in
+                            HStack {
+                                Image(systemName: "envelope")
+                                Text(email.value as String)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(width: 400, height: 300)
+        }
+    }
+}
+
 struct DuplicatesTableView: View {
     let duplicateGroups: [String: [CNContact]]
     @Environment(\.openWindow) private var openWindow
@@ -168,14 +217,44 @@ struct DuplicatesTableView: View {
                     .foregroundStyle(entry.count > 1 ? .red : .secondary)
             }
             TableColumn("") { (entry: DuplicateEntry) in
-                Button("Detail") {
-                    DuplicateDetailView.contacts = entry.contacts
-                    openWindow(id: "duplicateDetails")
+                HStack {
+                    Button("Detail") {
+                        DuplicateDetailView.contacts = entry.contacts
+                        openWindow(id: "duplicateDetails")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    
+                    Button("Merge") {
+                        MergePlanView.contact = mergeContacts(entry.contacts)
+                        openWindow(id: "mergePlan")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
         }
         .frame(minHeight: 400)
+    }
+    
+    private func mergeContacts(_ contacts: [CNContact]) -> CNContact {
+        // Simplified merge logic: take the first contact and append unique phone numbers and emails
+        guard let firstContact = contacts.first else { return CNContact() }
+        
+        let mergedContact = CNMutableContact()
+        mergedContact.givenName = firstContact.givenName
+        mergedContact.familyName = firstContact.familyName
+        
+        var phoneNumbers = Set<String>()
+        var emailAddresses = Set<String>()
+        
+        for contact in contacts {
+            phoneNumbers.formUnion(contact.phoneNumbers.map { $0.value.stringValue })
+            emailAddresses.formUnion(contact.emailAddresses.map { $0.value as String })
+        }
+        
+        mergedContact.phoneNumbers = phoneNumbers.map { CNLabeledValue(label: CNLabelPhoneNumberMobile, value: CNPhoneNumber(stringValue: $0)) }
+        mergedContact.emailAddresses = emailAddresses.map { CNLabeledValue(label: CNLabelHome, value: $0 as NSString) }
+        
+        return mergedContact
     }
 }
 

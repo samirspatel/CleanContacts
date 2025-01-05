@@ -34,6 +34,36 @@ struct ContactRowView: View {
     }
 }
 
+struct DuplicatesTableView: View {
+    let duplicateGroups: [String: [CNContact]]
+    
+    // Define a struct for our table data that conforms to Identifiable
+    struct DuplicateEntry: Identifiable {
+        let id: String // name will be our id
+        let name: String
+        let count: Int
+    }
+    
+    var tableData: [DuplicateEntry] {
+        duplicateGroups.values.map { contacts in
+            let firstContact = contacts[0]
+            let name = "\(firstContact.givenName) \(firstContact.familyName)".trimmingCharacters(in: .whitespaces)
+            return DuplicateEntry(id: name, name: name, count: contacts.count)
+        }.sorted { $0.count > $1.count }
+    }
+    
+    var body: some View {
+        Table(tableData) {
+            TableColumn("Contact Name", value: \.name)
+            TableColumn("Duplicates") { entry in
+                Text("\(entry.count - 1)")
+                    .foregroundStyle(entry.count > 1 ? .red : .secondary)
+            }
+        }
+        .frame(minHeight: 400)
+    }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var contacts: [Contact]
@@ -89,13 +119,8 @@ struct ContentView: View {
                                 .buttonStyle(.borderedProminent)
                                 .padding()
                             } else {
-                                List {
-                                    ForEach(Array(duplicateGroups.keys.sorted()), id: \.self) { key in
-                                        if let contacts = duplicateGroups[key] {
-                                            DuplicateGroupView(contacts: contacts)
-                                        }
-                                    }
-                                }
+                                DuplicatesTableView(duplicateGroups: duplicateGroups)
+                                    .padding()
                             }
                         }
                     }
@@ -319,49 +344,6 @@ struct ContentView: View {
     }
     
     // Keep your existing duplicate scanning methods...
-}
-
-struct DuplicateGroupView: View {
-    let contacts: [CNContact]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("\(contacts.count) duplicates found")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.bottom, 4)
-            
-            ForEach(contacts, id: \.identifier) { contact in
-                VStack(alignment: .leading) {
-                    Text("\(contact.givenName) \(contact.familyName)")
-                        .font(.subheadline)
-                    
-                    ForEach(contact.phoneNumbers, id: \.identifier) { phone in
-                        Text(phone.value.stringValue)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    ForEach(contact.emailAddresses, id: \.hashValue) { email in
-                        Text(email.value as String)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.leading)
-                
-                if contact != contacts.last {
-                    Divider()
-                }
-            }
-        }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(8)
-        .padding(.horizontal)
-    }
 }
 
 #Preview {

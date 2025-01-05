@@ -49,8 +49,8 @@ Built using:
 
 ## License
 
-[Your chosen license]
+Free to use and modify.
 
 ## Author
 
-[Your name/organization] 
+Samir Patel

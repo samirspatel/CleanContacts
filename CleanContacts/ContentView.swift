@@ -35,7 +35,9 @@ struct ContactRowView: View {
 }
 
 struct DuplicateDetailView: View {
-    static var contacts: [CNContact] = [] // Static property to hold contacts
+    static var contacts: [CNContact] = []
+    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
     
     var body: some View {
         VStack {
@@ -78,8 +80,48 @@ struct DuplicateDetailView: View {
                 }
                 .padding(.vertical, 4)
             }
+            
+            // Add buttons at the bottom
+            HStack {
+                Button("Close") {
+                    dismissWindow(id: "duplicateDetails")
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Merge These Contacts") {
+                    // Set up merge plan view
+                    MergePlanView.contact = mergeContacts(DuplicateDetailView.contacts)
+                    MergePlanView.originalContacts = DuplicateDetailView.contacts
+                    dismissWindow(id: "duplicateDetails")
+                    openWindow(id: "mergePlan")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
         }
         .frame(width: 400, height: 500)
+    }
+    
+    private func mergeContacts(_ contacts: [CNContact]) -> CNContact {
+        // Simplified merge logic: take the first contact and append unique phone numbers and emails
+        guard let firstContact = contacts.first else { return CNContact() }
+        
+        let mergedContact = CNMutableContact()
+        mergedContact.givenName = firstContact.givenName
+        mergedContact.familyName = firstContact.familyName
+        
+        var phoneNumbers = Set<String>()
+        var emailAddresses = Set<String>()
+        
+        for contact in contacts {
+            phoneNumbers.formUnion(contact.phoneNumbers.map { $0.value.stringValue })
+            emailAddresses.formUnion(contact.emailAddresses.map { $0.value as String })
+        }
+        
+        mergedContact.phoneNumbers = phoneNumbers.map { CNLabeledValue(label: CNLabelPhoneNumberMobile, value: CNPhoneNumber(stringValue: $0)) }
+        mergedContact.emailAddresses = emailAddresses.map { CNLabeledValue(label: CNLabelHome, value: $0 as NSString) }
+        
+        return mergedContact
     }
 }
 
@@ -137,6 +179,11 @@ struct DuplicateDetailWindow: Scene {
 
 struct MergePlanView: View {
     static var contact: CNContact?
+    static var originalContacts: [CNContact]?  // Add this to store original contacts
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+    @State private var showAlert = false
+    @State private var alertMessage = ""
     
     var body: some View {
         if let contact = MergePlanView.contact {
@@ -178,8 +225,62 @@ struct MergePlanView: View {
                     }
                 }
                 .padding(.vertical, 4)
+                
+                Spacer()
+                
+                HStack {
+                    Button("Cancel") {
+                        dismissWindow(id: "mergePlan")
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Merge Contact") {
+                        mergeContacts()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
             }
             .frame(width: 400, height: 300)
+            .alert("Merge Result", isPresented: $showAlert) {
+                Button("OK") {
+                    if !alertMessage.contains("Error") {
+                        dismissWindow(id: "mergePlan")
+                    }
+                }
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+    
+    private func mergeContacts() {
+        guard let mergedContact = MergePlanView.contact as? CNMutableContact,
+              let originalContacts = MergePlanView.originalContacts else {
+            return
+        }
+        
+        let store = CNContactStore()
+        
+        do {
+            // Create save request for merged contact
+            let saveRequest = CNSaveRequest()
+            saveRequest.add(mergedContact, toContainerWithIdentifier: nil)
+            
+            // Create delete requests for original contacts
+            for contact in originalContacts {
+                let mutableContact = contact.mutableCopy() as! CNMutableContact
+                saveRequest.delete(mutableContact)
+            }
+            
+            // Execute the save request
+            try store.execute(saveRequest)
+            
+            alertMessage = "Contacts successfully merged!"
+            showAlert = true
+        } catch {
+            alertMessage = "Error merging contacts: \(error.localizedDescription)"
+            showAlert = true
         }
     }
 }
@@ -226,6 +327,7 @@ struct DuplicatesTableView: View {
                     
                     Button("Merge") {
                         MergePlanView.contact = mergeContacts(entry.contacts)
+                        MergePlanView.originalContacts = entry.contacts  // Store original contacts
                         openWindow(id: "mergePlan")
                     }
                     .buttonStyle(.borderedProminent)

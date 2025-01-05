@@ -334,20 +334,11 @@ struct DuplicatesTableView: View {
                     .foregroundStyle(entry.count > 1 ? .red : .secondary)
             }
             TableColumn("") { (entry: DuplicateEntry) in
-                HStack {
-                    Button("Detail") {
-                        DuplicateDetailView.contacts = entry.contacts
-                        openWindow(id: "duplicateDetails")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    
-                    Button("Merge") {
-                        MergePlanView.contact = mergeContacts(entry.contacts)
-                        MergePlanView.originalContacts = entry.contacts  // Store original contacts
-                        openWindow(id: "mergePlan")
-                    }
-                    .buttonStyle(.borderedProminent)
+                Button("Detail") {
+                    DuplicateDetailView.contacts = entry.contacts
+                    openWindow(id: "duplicateDetails")
                 }
+                .buttonStyle(.borderedProminent)
             }
         }
         .frame(minHeight: 400)

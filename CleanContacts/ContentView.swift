@@ -158,6 +158,9 @@ struct DuplicateDetailView: View {
             
             try store.execute(saveRequest)
             
+            // Call completion handler to update UI
+            detailStore.onMergeComplete?(contacts)
+            
             alertMessage = "Contacts successfully merged!"
             showAlert = true
         } catch {
@@ -169,7 +172,6 @@ struct DuplicateDetailView: View {
 
 struct DuplicatesTableView: View {
     @Binding var duplicateGroups: [String: [CNContact]]
-    @State private var mergedGroups: Set<String> = []
     @State private var selectedItems: Set<String> = []
     @State private var showDeleteAlert = false
     @Environment(\.openWindow) private var openWindow
@@ -224,24 +226,18 @@ struct DuplicatesTableView: View {
                         .background(selectedItems.contains(entry.id) ? Color.accentColor.opacity(0.2) : Color.clear)
                 }
                 TableColumn("Status") { entry in
-                    HStack {
-                        if mergedGroups.contains(entry.name) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        Button("Detail") {
-                            detailStore.selectedContacts = entry.contacts
-                            detailStore.onMergeComplete = { contacts in
-                                if let firstContact = contacts.first {
-                                    let name = "\(firstContact.givenName) \(firstContact.familyName)".trimmingCharacters(in: .whitespaces)
-                                    mergedGroups.insert(name)
-                                }
+                    Button("Detail") {
+                        detailStore.selectedContacts = entry.contacts
+                        detailStore.onMergeComplete = { contacts in
+                            if let firstContact = contacts.first {
+                                // Remove the merged group from duplicateGroups
+                                let name = "\(firstContact.givenName) \(firstContact.familyName)".trimmingCharacters(in: .whitespaces)
+                                duplicateGroups.removeValue(forKey: name.lowercased())
                             }
-                            openWindow(id: "duplicateDetails")
                         }
-                        .buttonStyle(.borderedProminent)
+                        openWindow(id: "duplicateDetails")
                     }
-                    .background(selectedItems.contains(entry.id) ? Color.accentColor.opacity(0.2) : Color.clear)
+                    .buttonStyle(.borderedProminent)
                 }
             }
             .frame(minHeight: 400)

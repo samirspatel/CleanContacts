@@ -1,10 +1,3 @@
-//
-//  Item.swift
-//  CleanContacts
-//
-//  Created by Samir Patel on 1/4/25.
-//
-
 import Foundation
 import SwiftData
 

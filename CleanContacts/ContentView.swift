@@ -255,7 +255,7 @@ struct MergePlanView: View {
 }
 
 struct DuplicatesTableView: View {
-    let duplicateGroups: [String: [CNContact]]
+    @Binding var duplicateGroups: [String: [CNContact]]
     @State private var mergedGroups: Set<String> = []
     @State private var selectedItems: Set<String> = []
     @State private var showDeleteAlert = false
@@ -357,21 +357,30 @@ struct DuplicatesTableView: View {
                     CNContactFamilyNameKey as CNKeyDescriptor
                 ]
                 
-                // Get full contacts with all required keys
                 let fullContacts = try selectedContacts.map { contact in
                     try store.unifiedContact(withIdentifier: contact.identifier, keysToFetch: keysToFetch)
                 }
                 
                 let saveRequest = CNSaveRequest()
                 
-                // Delete the selected contacts
                 for contact in fullContacts {
                     let mutableContact = contact.mutableCopy() as! CNMutableContact
                     saveRequest.delete(mutableContact)
                 }
                 
                 try store.execute(saveRequest)
-                selectedItems.removeAll()
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    // Remove the deleted contacts from duplicateGroups
+                    let deletedIds = Set(fullContacts.map { $0.identifier })
+                    duplicateGroups = duplicateGroups.mapValues { contacts in
+                        contacts.filter { !deletedIds.contains($0.identifier) }
+                    }
+                    // Remove any groups that now have less than 2 contacts
+                    duplicateGroups = duplicateGroups.filter { $0.value.count > 1 }
+                    selectedItems.removeAll()
+                }
                 
             } catch {
                 print("Error deleting contacts: \(error.localizedDescription)")
@@ -426,7 +435,7 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         DuplicatesTableView(
-                            duplicateGroups: duplicateGroups
+                            duplicateGroups: $duplicateGroups
                         )
                         .padding()
                     }
@@ -456,7 +465,6 @@ struct ContentView: View {
             isDuplicateSearching = true
         }
         
-        // Move to background task
         await Task.detached(priority: .background) {
             let store = CNContactStore()
             
@@ -475,13 +483,15 @@ struct ContentView: View {
                     contacts.append(contact)
                 }
                 
-                // Process duplicates in background
-                var groups: [String: [CNContact]] = [:]
+                var groups: [String: Set<CNContact>] = [:]
                 
                 for contact in contacts {
                     let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces).lowercased()
                     let phones = contact.phoneNumbers.map { $0.value.stringValue.filter { $0.isNumber } }
                     let emails = contact.emailAddresses.map { $0.value as String }
+                    
+                    // Skip contacts with no identifying information
+                    guard !name.isEmpty || !phones.isEmpty || !emails.isEmpty else { continue }
                     
                     var keys: Set<String> = []
                     
@@ -497,14 +507,25 @@ struct ContentView: View {
                         keys.insert("e_\(email)")
                     }
                     
-                    for key in keys {
-                        groups[key, default: []].append(contact)
+                    // Only group contacts that have at least one matching criteria
+                    if !keys.isEmpty {
+                        let groupKey = !name.isEmpty ? name : (phones.first ?? emails.first ?? "unknown")
+                        groups[groupKey, default: []].insert(contact)
+                        
+                        for key in keys {
+                            if let relatedContacts = groups[key] {
+                                groups[groupKey]?.formUnion(relatedContacts)
+                                groups.removeValue(forKey: key)
+                            }
+                        }
                     }
                 }
                 
-                let duplicates = groups.filter { $0.value.count > 1 }
+                // Filter out groups with no name and single contacts
+                let duplicates = groups
+                    .filter { !$0.key.isEmpty && $0.value.count > 1 }
+                    .mapValues { Array($0) }
                 
-                // Update UI on main thread
                 await MainActor.run {
                     duplicateGroups = duplicates
                     isDuplicateSearching = false

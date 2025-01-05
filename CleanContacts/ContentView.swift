@@ -37,18 +37,24 @@ struct ContactRowView: View {
 struct DuplicatesTableView: View {
     let duplicateGroups: [String: [CNContact]]
     
-    // Define a struct for our table data that conforms to Identifiable
+    // Modified DuplicateEntry to use a unique ID
     struct DuplicateEntry: Identifiable {
-        let id: String // name will be our id
+        let id: UUID // Use UUID for unique identification
         let name: String
         let count: Int
+        let contacts: [CNContact] // Store the actual contacts for reference
     }
     
     var tableData: [DuplicateEntry] {
         duplicateGroups.values.map { contacts in
             let firstContact = contacts[0]
             let name = "\(firstContact.givenName) \(firstContact.familyName)".trimmingCharacters(in: .whitespaces)
-            return DuplicateEntry(id: name, name: name, count: contacts.count)
+            return DuplicateEntry(
+                id: UUID(), // Generate unique ID
+                name: name,
+                count: contacts.count,
+                contacts: contacts
+            )
         }.sorted { $0.count > $1.count }
     }
     

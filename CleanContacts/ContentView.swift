@@ -43,7 +43,8 @@ struct ContactRowView: View {
 struct DuplicateDetailView: View {
     @StateObject private var detailStore = DetailViewStore.shared
     @Environment(\.dismissWindow) private var dismissWindow
-    @Environment(\.openWindow) private var openWindow
+    @State private var showAlert = false
+    @State private var alertMessage = ""
     
     var body: some View {
         if let contacts = detailStore.selectedContacts {
@@ -94,109 +95,20 @@ struct DuplicateDetailView: View {
                     }
                     .buttonStyle(.bordered)
                     
-                    Button("Merge These Contacts") {
-                        MergePlanView.contact = mergeContacts(contacts)
-                        MergePlanView.originalContacts = contacts
-                        MergePlanView.onMergeComplete = {
-                            detailStore.onMergeComplete?(contacts)
-                        }
-                        dismissWindow(id: "duplicateDetails")
-                        openWindow(id: "mergePlan")
+                    Button("Merge Contacts") {
+                        mergeContacts(contacts)
                     }
                     .buttonStyle(.borderedProminent)
                 }
                 .padding()
             }
             .frame(width: 400, height: 500)
-        }
-    }
-    
-    private func mergeContacts(_ contacts: [CNContact]) -> CNContact {
-        // Simplified merge logic: take the first contact and append unique phone numbers and emails
-        guard let firstContact = contacts.first else { return CNContact() }
-        
-        let mergedContact = CNMutableContact()
-        mergedContact.givenName = firstContact.givenName
-        mergedContact.familyName = firstContact.familyName
-        
-        var phoneNumbers = Set<String>()
-        var emailAddresses = Set<String>()
-        
-        for contact in contacts {
-            phoneNumbers.formUnion(contact.phoneNumbers.map { $0.value.stringValue })
-            emailAddresses.formUnion(contact.emailAddresses.map { $0.value as String })
-        }
-        
-        mergedContact.phoneNumbers = phoneNumbers.map { CNLabeledValue(label: CNLabelPhoneNumberMobile, value: CNPhoneNumber(stringValue: $0)) }
-        mergedContact.emailAddresses = emailAddresses.map { CNLabeledValue(label: CNLabelHome, value: $0 as NSString) }
-        
-        return mergedContact
-    }
-}
-
-struct MergePlanView: View {
-    static var contact: CNContact?
-    static var originalContacts: [CNContact]?
-    static var onMergeComplete: (() -> Void)? // Add callback for merge completion
-    @Environment(\.dismissWindow) private var dismissWindow
-    @State private var showAlert = false
-    @State private var alertMessage = ""
-    
-    var body: some View {
-        if let contact = MergePlanView.contact {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Merge Plan")
-                    .font(.title2)
-                    .bold()
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(contact.givenName) \(contact.familyName)")
-                        .font(.headline)
-                    
-                    if !contact.phoneNumbers.isEmpty {
-                        Text("Phone Numbers:")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        ForEach(contact.phoneNumbers, id: \.identifier) { phone in
-                            HStack(spacing: 4) {
-                                Image(systemName: "phone")
-                                    .imageScale(.small)
-                                Text(phone.value.stringValue)
-                            }
-                        }
-                    }
-                    
-                    if !contact.emailAddresses.isEmpty {
-                        Text("Email Addresses:")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        ForEach(contact.emailAddresses, id: \.hashValue) { email in
-                            HStack(spacing: 4) {
-                                Image(systemName: "envelope")
-                                    .imageScale(.small)
-                                Text(email.value as String)
-                            }
-                        }
-                    }
-                }
-                
-                HStack {
-                    Button("Close") {
-                        dismissWindow(id: "mergePlan")
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Button("Merge Contact") {
-                        mergeContacts()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-            .padding(12)
-            .fixedSize()
             .alert("Merge Result", isPresented: $showAlert) {
                 Button("OK") {
-                    dismissWindow(id: "mergePlan")
+                    if !alertMessage.contains("Error") {
+                        detailStore.onMergeComplete?(contacts)
+                        dismissWindow(id: "duplicateDetails")
+                    }
                 }
             } message: {
                 Text(alertMessage)
@@ -204,16 +116,10 @@ struct MergePlanView: View {
         }
     }
     
-    private func mergeContacts() {
-        guard let mergedContact = MergePlanView.contact as? CNMutableContact,
-              let originalContacts = MergePlanView.originalContacts else {
-            return
-        }
-        
+    private func mergeContacts(_ contacts: [CNContact]) {
         let store = CNContactStore()
         
         do {
-            // Fetch full contacts with all required keys
             let keysToFetch: [CNKeyDescriptor] = [
                 CNContactIdentifierKey as CNKeyDescriptor,
                 CNContactGivenNameKey as CNKeyDescriptor,
@@ -222,28 +128,35 @@ struct MergePlanView: View {
                 CNContactEmailAddressesKey as CNKeyDescriptor
             ]
             
-            // Get full contacts with all required keys
-            let fullContacts = try originalContacts.map { contact in
+            let fullContacts = try contacts.map { contact in
                 try store.unifiedContact(withIdentifier: contact.identifier, keysToFetch: keysToFetch)
             }
             
-            // Create save request
-            let saveRequest = CNSaveRequest()
+            // Create merged contact
+            let mergedContact = CNMutableContact()
+            mergedContact.givenName = contacts[0].givenName
+            mergedContact.familyName = contacts[0].familyName
             
-            // Add the merged contact first
+            var phoneNumbers = Set<String>()
+            var emailAddresses = Set<String>()
+            
+            for contact in contacts {
+                phoneNumbers.formUnion(contact.phoneNumbers.map { $0.value.stringValue })
+                emailAddresses.formUnion(contact.emailAddresses.map { $0.value as String })
+            }
+            
+            mergedContact.phoneNumbers = phoneNumbers.map { CNLabeledValue(label: CNLabelPhoneNumberMobile, value: CNPhoneNumber(stringValue: $0)) }
+            mergedContact.emailAddresses = emailAddresses.map { CNLabeledValue(label: CNLabelHome, value: $0 as NSString) }
+            
+            let saveRequest = CNSaveRequest()
             saveRequest.add(mergedContact, toContainerWithIdentifier: nil)
             
-            // Delete the original contacts
             for contact in fullContacts {
                 let mutableContact = contact.mutableCopy() as! CNMutableContact
                 saveRequest.delete(mutableContact)
             }
             
-            // Execute the save request
             try store.execute(saveRequest)
-            
-            // Call the completion handler to update the table
-            MergePlanView.onMergeComplete?()
             
             alertMessage = "Contacts successfully merged!"
             showAlert = true

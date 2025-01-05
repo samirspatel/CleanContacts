@@ -274,29 +274,35 @@ struct ContentView: View {
     }
     
     private func checkContactsAccess() {
-        print("Checking contacts access for bundle ID: \(Bundle.main.bundleIdentifier ?? "unknown")")
-        let status = CNContactStore.authorizationStatus(for: .contacts)
-        print("Initial authorization status: \(status.rawValue)")
-        
-        switch status {
-        case .notDetermined:
-            print("Status: Not determined - showing request button")
-            // Don't do anything, let user tap the request button
-        case .restricted, .denied:
-            print("Access restricted or denied")
-            alertMessage = "This app needs access to your contacts. Please grant access in System Settings."
-            showAlert = true
-        case .authorized:
-            print("Access already authorized - loading contacts")
-            isLoading = true
-            // Use Task for async call
-            Task {
+        Task {
+            print("Checking contacts access for bundle ID: \(Bundle.main.bundleIdentifier ?? "unknown")")
+            let status = CNContactStore.authorizationStatus(for: .contacts)
+            print("Initial authorization status: \(status.rawValue)")
+            
+            switch status {
+            case .notDetermined:
+                print("Status: Not determined - showing request button")
+                // Don't do anything, let user tap the request button
+            case .restricted, .denied:
+                print("Access restricted or denied")
+                await MainActor.run {
+                    alertMessage = "This app needs access to your contacts. Please grant access in System Settings."
+                    showAlert = true
+                }
+            case .authorized:
+                print("Access already authorized - loading contacts")
+                await MainActor.run {
+                    isLoading = true
+                }
+                // Already in a Task, so we can just await
                 await loadContacts()
+            @unknown default:
+                print("Unknown authorization status")
+                await MainActor.run {
+                    alertMessage = "Unknown contacts access status. Please check System Settings."
+                    showAlert = true
+                }
             }
-        @unknown default:
-            print("Unknown authorization status")
-            alertMessage = "Unknown contacts access status. Please check System Settings."
-            showAlert = true
         }
     }
     

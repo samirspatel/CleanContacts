@@ -94,7 +94,12 @@ echo "✅ Ticket stapled successfully"
 # Clean up the zip file
 rm "$HOME/Desktop/$APP_NAME/$APP_NAME.zip"
 
-# Create DMG
+# Before creating DMG, check and remove existing DMG
+if [ -f "$DMG_PATH" ]; then
+    echo "Removing existing DMG..."
+    rm "$DMG_PATH"
+fi
+
 echo "📦 Creating DMG..."
 create-dmg \
     --volname "$APP_NAME" \

@@ -358,6 +358,7 @@ struct ContentView: View {
             .tag(0)
         }
         .onAppear {
+            verifyEntitlements()
             checkContactsAccess()
         }
     }
@@ -519,8 +520,8 @@ struct ContentView: View {
             
             switch status {
             case .notDetermined:
-                print("Status: Not determined - showing request button")
-                // Don't do anything, let user tap the request button
+                print("Status: Not determined - requesting access")
+                await requestContactsAccess() // Directly request access instead of waiting for button
             case .restricted, .denied:
                 print("Access restricted or denied")
                 await MainActor.run {
@@ -532,7 +533,6 @@ struct ContentView: View {
                 await MainActor.run {
                     isLoading = true
                 }
-                // Already in a Task, so we can just await
                 await loadContacts()
             @unknown default:
                 print("Unknown authorization status")
@@ -574,10 +574,16 @@ struct ContentView: View {
             }
             
             do {
+                // Add debug print before requesting access
+                print("Current authorization status: \(CNContactStore.authorizationStatus(for: .contacts).rawValue)")
+                
                 let granted = try await store.requestAccess(for: .contacts)
+                print("Access request result: \(granted)")
                 
                 if granted {
                     print("Access granted, loading contacts...")
+                    // Add a small delay to ensure the permission is properly registered
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
                     await loadContacts()
                 } else {
                     print("Access denied by user")
@@ -589,12 +595,28 @@ struct ContentView: View {
                 }
             } catch {
                 print("Error requesting access: \(error.localizedDescription)")
+                print("Detailed error: \(error)")
                 await MainActor.run {
                     isLoading = false
-                    alertMessage = "Error: \(error.localizedDescription)"
+                    alertMessage = "Error requesting access: \(error.localizedDescription)\nPlease try again or grant access in System Settings."
                     showAlert = true
                 }
             }
+        }
+    }
+    
+    private func verifyEntitlements() {
+        let securityScopedResource = Bundle.main.object(forInfoDictionaryKey: "com.apple.security.personal-information.addressbook") as? Bool
+        print("Contacts entitlement present: \(securityScopedResource == true)")
+        
+        // Print all entitlements for debugging
+        if let path = Bundle.main.path(forResource: "CleanContacts", ofType: "entitlements") {
+            print("Entitlements file found at: \(path)")
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                print("Entitlements contents: \(String(data: data, encoding: .utf8) ?? "unable to read")")
+            }
+        } else {
+            print("No entitlements file found in bundle")
         }
     }
 }

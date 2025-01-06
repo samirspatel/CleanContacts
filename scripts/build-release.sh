@@ -15,6 +15,18 @@ ARCHIVE_PATH="$HOME/Desktop/$APP_NAME.xcarchive"
 DMG_PATH="$HOME/Desktop/$APP_NAME-$VERSION.dmg"
 NOTARIZATION_PROFILE="AC_PASSWORD"  # Set this up in your keychain
 
+# Check if Homebrew is installed
+if ! command -v brew &> /dev/null; then
+    echo "❌ Homebrew is not installed. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Check if create-dmg is installed
+if ! command -v create-dmg &> /dev/null; then
+    echo "📦 Installing create-dmg..."
+    brew install create-dmg
+fi
+
 echo "🚀 Building $APP_NAME version $VERSION..."
 
 # Clean build folder

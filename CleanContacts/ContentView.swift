@@ -364,7 +364,10 @@ struct ContentView: View {
     }
     
     private var hasContactAccess: Bool {
-        CNContactStore.authorizationStatus(for: .contacts) == .authorized
+        // Add debug print to see what status we're getting
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        print("Current contact access status: \(status.rawValue)")
+        return status == .authorized
     }
     
     private var totalDuplicates: Int {
@@ -570,39 +573,73 @@ struct ContentView: View {
             print("Requesting contacts access...")
             
             await MainActor.run {
-                isLoading = true // Show loading while requesting
+                isLoading = true
+            }
+            
+            // First check current status
+            let currentStatus = CNContactStore.authorizationStatus(for: .contacts)
+            print("Current status before request: \(currentStatus.rawValue)")
+            
+            if currentStatus == .authorized {
+                print("Already authorized, loading contacts directly")
+                await loadContacts()
+                return
             }
             
             do {
-                // Add debug print before requesting access
-                print("Current authorization status: \(CNContactStore.authorizationStatus(for: .contacts).rawValue)")
+                // Test access first with a simple fetch
+                try await testContactsAccessAsync(store)
                 
                 let granted = try await store.requestAccess(for: .contacts)
                 print("Access request result: \(granted)")
                 
                 if granted {
                     print("Access granted, loading contacts...")
-                    // Add a small delay to ensure the permission is properly registered
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+                    // Add a longer delay to ensure the permission is properly registered
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay
                     await loadContacts()
                 } else {
                     print("Access denied by user")
                     await MainActor.run {
                         isLoading = false
-                        alertMessage = "Access denied. Please try again or grant access in System Settings."
+                        alertMessage = "Access denied. Please grant access in System Settings."
                         showAlert = true
                     }
                 }
             } catch {
                 print("Error requesting access: \(error.localizedDescription)")
                 print("Detailed error: \(error)")
+                
+                // If we get an error but actually have access, try loading anyway
+                if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
+                    print("Despite error, we have authorization. Trying to load...")
+                    await loadContacts()
+                    return
+                }
+                
                 await MainActor.run {
                     isLoading = false
-                    alertMessage = "Error requesting access: \(error.localizedDescription)\nPlease try again or grant access in System Settings."
+                    alertMessage = "Error requesting access: \(error.localizedDescription)\nPlease try granting access in System Settings."
                     showAlert = true
                 }
             }
         }
+    }
+    
+    // New async test function
+    private func testContactsAccessAsync(_ store: CNContactStore) async throws {
+        let keys = [CNContactGivenNameKey] as [CNKeyDescriptor]
+        let request = CNContactFetchRequest(keysToFetch: keys)
+        
+        // Try to fetch a single contact
+        var gotContact = false
+        try store.enumerateContacts(with: request) { contact, stop in
+            print("Successfully accessed contact: \(contact.givenName)")
+            gotContact = true
+            stop.pointee = true
+        }
+        
+        print("Test access result: \(gotContact ? "succeeded" : "no contacts found")")
     }
     
     private func verifyEntitlements() {

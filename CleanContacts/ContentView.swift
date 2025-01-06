@@ -358,12 +358,16 @@ struct ContentView: View {
             .tag(0)
         }
         .onAppear {
+            verifyEntitlements()
             checkContactsAccess()
         }
     }
     
     private var hasContactAccess: Bool {
-        CNContactStore.authorizationStatus(for: .contacts) == .authorized
+        // Add debug print to see what status we're getting
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        print("Current contact access status: \(status.rawValue)")
+        return status == .authorized
     }
     
     private var totalDuplicates: Int {
@@ -519,8 +523,8 @@ struct ContentView: View {
             
             switch status {
             case .notDetermined:
-                print("Status: Not determined - showing request button")
-                // Don't do anything, let user tap the request button
+                print("Status: Not determined - requesting access")
+                await requestContactsAccess() // Directly request access instead of waiting for button
             case .restricted, .denied:
                 print("Access restricted or denied")
                 await MainActor.run {
@@ -532,7 +536,6 @@ struct ContentView: View {
                 await MainActor.run {
                     isLoading = true
                 }
-                // Already in a Task, so we can just await
                 await loadContacts()
             @unknown default:
                 print("Unknown authorization status")
@@ -570,31 +573,87 @@ struct ContentView: View {
             print("Requesting contacts access...")
             
             await MainActor.run {
-                isLoading = true // Show loading while requesting
+                isLoading = true
+            }
+            
+            // First check current status
+            let currentStatus = CNContactStore.authorizationStatus(for: .contacts)
+            print("Current status before request: \(currentStatus.rawValue)")
+            
+            if currentStatus == .authorized {
+                print("Already authorized, loading contacts directly")
+                await loadContacts()
+                return
             }
             
             do {
+                // Test access first with a simple fetch
+                try await testContactsAccessAsync(store)
+                
                 let granted = try await store.requestAccess(for: .contacts)
+                print("Access request result: \(granted)")
                 
                 if granted {
                     print("Access granted, loading contacts...")
+                    // Add a longer delay to ensure the permission is properly registered
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay
                     await loadContacts()
                 } else {
                     print("Access denied by user")
                     await MainActor.run {
                         isLoading = false
-                        alertMessage = "Access denied. Please try again or grant access in System Settings."
+                        alertMessage = "Access denied. Please grant access in System Settings."
                         showAlert = true
                     }
                 }
             } catch {
                 print("Error requesting access: \(error.localizedDescription)")
+                print("Detailed error: \(error)")
+                
+                // If we get an error but actually have access, try loading anyway
+                if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
+                    print("Despite error, we have authorization. Trying to load...")
+                    await loadContacts()
+                    return
+                }
+                
                 await MainActor.run {
                     isLoading = false
-                    alertMessage = "Error: \(error.localizedDescription)"
+                    alertMessage = "Error requesting access: \(error.localizedDescription)\nPlease try granting access in System Settings."
                     showAlert = true
                 }
             }
+        }
+    }
+    
+    // New async test function
+    private func testContactsAccessAsync(_ store: CNContactStore) async throws {
+        let keys = [CNContactGivenNameKey] as [CNKeyDescriptor]
+        let request = CNContactFetchRequest(keysToFetch: keys)
+        
+        // Try to fetch a single contact
+        var gotContact = false
+        try store.enumerateContacts(with: request) { contact, stop in
+            print("Successfully accessed contact: \(contact.givenName)")
+            gotContact = true
+            stop.pointee = true
+        }
+        
+        print("Test access result: \(gotContact ? "succeeded" : "no contacts found")")
+    }
+    
+    private func verifyEntitlements() {
+        let securityScopedResource = Bundle.main.object(forInfoDictionaryKey: "com.apple.security.personal-information.addressbook") as? Bool
+        print("Contacts entitlement present: \(securityScopedResource == true)")
+        
+        // Print all entitlements for debugging
+        if let path = Bundle.main.path(forResource: "CleanContacts", ofType: "entitlements") {
+            print("Entitlements file found at: \(path)")
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                print("Entitlements contents: \(String(data: data, encoding: .utf8) ?? "unable to read")")
+            }
+        } else {
+            print("No entitlements file found in bundle")
         }
     }
 }

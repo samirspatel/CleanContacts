@@ -111,3 +111,54 @@ SOFTWARE.
 ## Author
 
 Samir Patel
+
+## Building for Distribution
+
+Prerequisites:
+- Xcode Command Line Tools
+- create-dmg (`brew install create-dmg`)
+- Apple Developer ID certificate
+- Notarization credentials in keychain
+
+To build a distributable version:
+
+1. Set up notarization credentials:
+```bash
+xcrun notarytool store-credentials "AC_PASSWORD" \
+    --apple-id "your@email.com" \
+    --team-id "YOUR_TEAM_ID" \
+    --password "app-specific-password"
+```
+
+2. Run the build script:
+```bash
+chmod +x scripts/build-release.sh
+./scripts/build-release.sh
+```
+
+The script will:
+- Build the app
+- Sign with your Developer ID
+- Notarize with Apple
+- Create a DMG
+- Clean up temporary files
+
+### Setting up Code Signing
+
+1. Open Xcode project settings
+2. Select the CleanContacts target
+3. Go to Signing & Capabilities tab
+4. Change signing configuration:
+   - Select "Sign to Run Locally" for development
+   - Select "Developer ID" for distribution
+   - Ensure "Automatically manage signing" is checked
+5. Create an archive:
+   - Select Product > Archive
+   - In the Archives window, click "Distribute App"
+   - Choose "Developer ID" distribution
+   - Follow the prompts to set up your Developer ID certificate
+
+After setting up signing, you can run the build script:
+```bash
+./scripts/build-release.sh
+```

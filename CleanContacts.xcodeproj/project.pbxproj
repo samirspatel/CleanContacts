@@ -73,8 +73,6 @@
 			isa = PBXGroup;
 			children = (
 				D42D714C2D2A491C00375169 /* CleanContacts */,
-				D42D71602D2A491E00375169 /* CleanContactsTests */,
-				D42D716A2D2A491E00375169 /* CleanContactsUITests */,
 				D42D71822D2A4E9C00375169 /* Frameworks */,
 				D42D714B2D2A491C00375169 /* Products */,
 			);
@@ -90,14 +88,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		D42D71822D2A4E9C00375169 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				D42D71832D2A4E9C00375169 /* Contacts.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		D42D714C2D2A491C00375169 /* CleanContacts */ = {
 			isa = PBXGroup;
 			children = (
@@ -108,6 +98,14 @@
 				D42D71932D2A491C00375174 /* Item.swift */,
 			);
 			path = CleanContacts;
+			sourceTree = "<group>";
+		};
+		D42D71822D2A4E9C00375169 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D42D71832D2A4E9C00375169 /* Contacts.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -148,9 +146,6 @@
 			dependencies = (
 				D42D715F2D2A491E00375169 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				D42D71602D2A491E00375169 /* CleanContactsTests */,
-			);
 			name = CleanContactsTests;
 			packageProductDependencies = (
 			);
@@ -170,9 +165,6 @@
 			);
 			dependencies = (
 				D42D71692D2A491E00375169 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				D42D716A2D2A491E00375169 /* CleanContactsUITests */,
 			);
 			name = CleanContactsUITests;
 			packageProductDependencies = (
@@ -415,12 +407,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = CleanContacts/CleanContacts.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CleanContacts/Preview Content\"";
 				DEVELOPMENT_TEAM = L3Z9CXRSFM;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = L3Z9CXRSFM;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -436,6 +430,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.samirpatel.CleanContacts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -447,12 +443,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = CleanContacts/CleanContacts.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CleanContacts/Preview Content\"";
 				DEVELOPMENT_TEAM = L3Z9CXRSFM;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = L3Z9CXRSFM;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -467,6 +465,8 @@
 				NEW_SETTING1 = "";
 				PRODUCT_BUNDLE_IDENTIFIER = me.samirpatel.CleanContacts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};

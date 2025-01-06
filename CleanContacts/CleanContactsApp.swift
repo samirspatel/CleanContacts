@@ -4,8 +4,8 @@ import Contacts
 
 @main
 struct CleanContactsApp: App {
-    static func main() throws {
-        CleanContactsApp.main()
+    static func main() {
+        NSApplication.shared.run()
     }
     
     var body: some Scene {

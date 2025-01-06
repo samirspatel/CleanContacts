@@ -22,7 +22,9 @@ xcodebuild archive \
     -configuration Release \
     DEVELOPMENT_TEAM="$TEAM_ID" \
     CODE_SIGN_STYLE="Manual" \
-    CODE_SIGN_IDENTITY="Developer ID Application"
+    CODE_SIGN_IDENTITY="Developer ID Application" \
+    SWIFT_OPTIMIZATION_LEVEL="-O" \
+    SWIFT_COMPILATION_MODE="wholemodule"
 
 if [ $? -ne 0 ]; then
     echo "❌ Archive failed"

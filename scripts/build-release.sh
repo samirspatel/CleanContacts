@@ -32,7 +32,7 @@ echo "🚀 Building $APP_NAME version $VERSION..."
 # Clean build folder
 xcodebuild clean -scheme "$SCHEME_NAME" -configuration Release
 
-# Create archive
+# Create archive with forced settings
 xcodebuild archive \
     -scheme "$SCHEME_NAME" \
     -archivePath "$ARCHIVE_PATH" \
@@ -40,6 +40,12 @@ xcodebuild archive \
     DEVELOPMENT_TEAM="$TEAM_ID" \
     CODE_SIGN_STYLE="Manual" \
     CODE_SIGN_IDENTITY="Developer ID Application" \
+    CODE_SIGN_ENTITLEMENTS="CleanContacts/CleanContacts.entitlements" \
+    PROVISIONING_PROFILE_SPECIFIER="" \
+    CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION="YES" \
+    CODE_SIGNING_REQUIRED="YES" \
+    CODE_SIGNING_ALLOWED="YES" \
+    OTHER_CODE_SIGN_FLAGS="--options=runtime" \
     SWIFT_OPTIMIZATION_LEVEL="-O" \
     SWIFT_COMPILATION_MODE="wholemodule"
 
@@ -94,6 +100,26 @@ echo "✅ Ticket stapled successfully"
 # Clean up the zip file
 rm "$HOME/Desktop/$APP_NAME/$APP_NAME.zip"
 
+# Verify code signing
+echo "🔍 Verifying code signing..."
+codesign --verify --verbose "$HOME/Desktop/$APP_NAME/$APP_NAME.app"
+codesign -d --entitlements :- "$HOME/Desktop/$APP_NAME/$APP_NAME.app"
+
+if [ $? -ne 0 ]; then
+    echo "❌ Code signing verification failed"
+    exit 1
+fi
+
+# Verify entitlements
+echo "🔍 Verifying entitlements..."
+codesign -d --entitlements :- "$HOME/Desktop/$APP_NAME/$APP_NAME.app" | grep -A2 "com.apple.security.personal-information.addressbook"
+
+if [ $? -ne 0 ]; then
+    echo "❌ Contacts entitlement not found in built app"
+    exit 1
+fi
+
+# Now create DMG
 # Before creating DMG, check and remove existing DMG
 if [ -f "$DMG_PATH" ]; then
     echo "Removing existing DMG..."
@@ -119,7 +145,7 @@ fi
 
 echo "✅ DMG created successfully at $DMG_PATH"
 
-# Clean up
+# Clean up at the end
 rm -rf "$ARCHIVE_PATH"
 rm -rf "$HOME/Desktop/$APP_NAME"
 

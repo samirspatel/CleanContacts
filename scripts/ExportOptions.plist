@@ -10,5 +10,12 @@
     <string>manual</string>
     <key>signingCertificate</key>
     <string>Developer ID Application</string>
+    <key>entitlements</key>
+    <dict>
+        <key>com.apple.security.app-sandbox</key>
+        <true/>
+        <key>com.apple.security.personal-information.addressbook</key>
+        <true/>
+    </dict>
 </dict>
 </plist> 

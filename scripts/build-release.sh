@@ -20,9 +20,9 @@ xcodebuild archive \
     -scheme "$SCHEME_NAME" \
     -archivePath "$ARCHIVE_PATH" \
     -configuration Release \
-    CODE_SIGN_STYLE="Automatic" \
-    CODE_SIGN_IDENTITY="Developer ID Application" \
-    DEVELOPMENT_TEAM="$TEAM_ID"
+    DEVELOPMENT_TEAM="$TEAM_ID" \
+    CODE_SIGN_STYLE="Manual" \
+    CODE_SIGN_IDENTITY="Developer ID Application"
 
 if [ $? -ne 0 ]; then
     echo "❌ Archive failed"

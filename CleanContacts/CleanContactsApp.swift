@@ -4,8 +4,8 @@ import Contacts
 
 @main
 struct CleanContactsApp: App {
-    static func main() {
-        // Entry point for the app
+    static func main() throws {
+        CleanContactsApp.main()
     }
     
     var body: some Scene {

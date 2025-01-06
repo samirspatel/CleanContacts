@@ -1,21 +1,13 @@
-import SwiftUI
-import SwiftData
-import Contacts
-
 @main
 struct CleanContactsApp: App {
-    static func main() {
-        // Entry point for the app
-    }
-    
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowStyle(.hiddenTitleBar) // Optional: for a more modern look
         
         Window("Duplicate Details", id: "duplicateDetails") {
             DuplicateDetailView()
         }
     }
-}
+} 

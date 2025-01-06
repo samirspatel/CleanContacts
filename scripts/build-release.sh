@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# xcrun notarytool store-credentials "AC_PASSWORD" \
+#     --apple-id "sameg14@icloud.com" \
+#     --team-id "L3Z9CXRSFM" \
+#     --password "pzoa-wrzu-vucz-gzcv"
+
 # Configuration
 APP_NAME="CleanContacts"
 SCHEME_NAME="CleanContacts"
@@ -46,9 +51,14 @@ fi
 
 echo "✅ App exported successfully"
 
+# Create ZIP for notarization
+echo "📦 Creating ZIP for notarization..."
+cd "$HOME/Desktop/$APP_NAME"
+ditto -c -k --keepParent "$APP_NAME.app" "$APP_NAME.zip"
+
 # Notarize the app
 echo "🔐 Notarizing app..."
-xcrun notarytool submit "$HOME/Desktop/$APP_NAME/$APP_NAME.app" \
+xcrun notarytool submit "$HOME/Desktop/$APP_NAME/$APP_NAME.zip" \
     --keychain-profile "$NOTARIZATION_PROFILE" \
     --wait
 
@@ -59,7 +69,7 @@ fi
 
 echo "✅ App notarized successfully"
 
-# Staple the ticket
+# Staple the ticket to the .app, not the zip
 xcrun stapler staple "$HOME/Desktop/$APP_NAME/$APP_NAME.app"
 
 if [ $? -ne 0 ]; then
@@ -68,6 +78,9 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ Ticket stapled successfully"
+
+# Clean up the zip file
+rm "$HOME/Desktop/$APP_NAME/$APP_NAME.zip"
 
 # Create DMG
 echo "📦 Creating DMG..."
